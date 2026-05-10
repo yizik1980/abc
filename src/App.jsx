@@ -3,6 +3,7 @@ import { gamePhase } from './signals/gameState'
 import WelcomeScreen from './components/WelcomeScreen'
 import GameStage from './components/GameStage'
 import CompletionScreen from './components/CompletionScreen'
+import Footer from './components/Footer'
 import './App.css'
 
 export default function App() {
@@ -14,6 +15,7 @@ export default function App() {
       {phase === 'welcome' && <WelcomeScreen />}
       {(phase === 'stage' || phase === 'result') && <GameStage />}
       {phase === 'completion' && <CompletionScreen />}
+      <Footer />
     </div>
   )
 }

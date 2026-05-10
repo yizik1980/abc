@@ -7,7 +7,8 @@ export default function LetterExamples({ letter, isUppercase, items, selectedWor
   const tr = t.value
   const correctTotal = items.filter(i => i.correct).length
   const correctSelected = items.filter(i => i.correct && selectedWords.has(i.word)).length
-  const allDone = correctSelected === correctTotal
+  const wrongSelected = items.filter(i => !i.correct && selectedWords.has(i.word)).length
+  const allDone = correctSelected === correctTotal && wrongSelected === 0
 
   function handleCardClick(word) {
     pronounceWord(word)
@@ -22,23 +23,29 @@ export default function LetterExamples({ letter, isUppercase, items, selectedWor
           <span className="letter-highlight">{letter.toUpperCase()}</span>
           <span className="case-tag"> ({isUppercase ? tr.uppercase : tr.lowercase})</span>
         </h3>
-        <span className={`selection-badge ${allDone ? 'done' : ''}`}>
+        <span className={`selection-badge ${allDone ? 'done' : wrongSelected > 0 ? 'has-wrong' : ''}`}>
           {correctSelected}/{correctTotal}
         </span>
       </div>
 
       <div className="examples-grid">
-        {items.map(({ emoji, word }) => {
+        {items.map(({ emoji, word, correct }) => {
           const selected = selectedWords.has(word)
+          const isWrong = selected && !correct
+
+          let cardClass = 'example-card interactive'
+          if (selected) cardClass += isWrong ? ' wrong' : ' selected'
+
           return (
             <button
               key={word}
-              className={`example-card interactive ${selected ? 'selected' : ''}`}
+              className={cardClass}
               onClick={() => handleCardClick(word)}
               type="button"
               title={word}
             >
-              {selected && <span className="card-check">✓</span>}
+              {selected && !isWrong && <span className="card-check">✓</span>}
+              {isWrong && <span className="card-x">✕</span>}
               <span className="example-emoji">{emoji}</span>
               <span className="example-word">{word}</span>
               <span className="card-sound">🔊</span>
@@ -47,10 +54,12 @@ export default function LetterExamples({ letter, isUppercase, items, selectedWor
         })}
       </div>
 
-      <p className={`selection-hint ${allDone ? 'hint-done' : ''}`}>
+      <p className={`selection-hint ${allDone ? 'hint-done' : wrongSelected > 0 ? 'hint-wrong' : ''}`}>
         {allDone
           ? '✅ ' + (tr.dir === 'rtl' ? 'מצוין! עכשיו לחץ שלב הבא' : 'Great! Now click Next Stage')
-          : tr.selectIconsHint}
+          : wrongSelected > 0
+            ? (tr.dir === 'rtl' ? '❌ הסר את המילים השגויות כדי להמשיך' : '❌ Remove wrong words to continue')
+            : tr.selectIconsHint}
       </p>
     </div>
   )

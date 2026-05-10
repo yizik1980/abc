@@ -47,7 +47,9 @@ export default function GameStage() {
   }
 
   const allCorrectSelected = useMemo(
-    () => allItems.filter(i => i.correct).every(i => selectedWords.has(i.word)),
+    () =>
+      allItems.filter(i => i.correct).every(i => selectedWords.has(i.word)) &&
+      allItems.filter(i => !i.correct).every(i => !selectedWords.has(i.word)),
     [allItems, selectedWords]
   )
 
