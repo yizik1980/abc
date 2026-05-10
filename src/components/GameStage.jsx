@@ -2,7 +2,7 @@ import { useRef, useState, useEffect, useMemo } from 'react'
 import { useSignals } from '@preact/signals-react/runtime'
 import {
   currentStage, validationScore, stageResults,
-  gamePhase, userName, selectedLetters, t,
+  gamePhase, userName, selectedLetters, t, difficulty,
 } from '../signals/gameState'
 import { getDecoys } from '../data/letters'
 import { pronounceLetter } from '../utils/audio'
@@ -12,6 +12,7 @@ import ColorPicker from './ColorPicker'
 import LetterExamples from './LetterExamples'
 import ResultOverlay from './ResultOverlay'
 import LangToggle from './LangToggle'
+import VowelFill from './VowelFill'
 
 function shuffle(arr) {
   return [...arr].sort(() => Math.random() - 0.5)
@@ -23,8 +24,12 @@ export default function GameStage() {
   const stage = currentStage.value
   const { letter, hint, examples, isUppercase } = selectedLetters.value[stage]
   const tr = t.value
+  const level = difficulty.value
 
-  // Build shuffled icon grid once per stage (correct + decoys)
+  // Word used for level 2 (trace word) and level 3 (vowel fill)
+  const traceWord = examples[0].word.split(' ')[0].toUpperCase()
+
+  // Icon grid: 4 correct + 4 decoys
   const allItems = useMemo(() => {
     const correct = examples.map(e => ({ ...e, correct: true }))
     const decoys = getDecoys(letter, 4).map(e => ({ ...e, correct: false }))
@@ -32,10 +37,11 @@ export default function GameStage() {
   }, [stage]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const [selectedWords, setSelectedWords] = useState(new Set())
+  const [vowelOk, setVowelOk] = useState(false)
 
-  // Reset selections when stage changes
   useEffect(() => {
     setSelectedWords(new Set())
+    setVowelOk(false)
   }, [stage])
 
   function toggleWord(word) {
@@ -46,18 +52,24 @@ export default function GameStage() {
     })
   }
 
-  const allCorrectSelected = useMemo(
+  const iconsOk = useMemo(
     () =>
       allItems.filter(i => i.correct).every(i => selectedWords.has(i.word)) &&
       allItems.filter(i => !i.correct).every(i => !selectedWords.has(i.word)),
     [allItems, selectedWords]
   )
 
+  const canProceed = level === 3
+    ? iconsOk && vowelOk
+    : iconsOk
+
+  // ---- actions ----
   function handleNextStage() {
     const canvas = canvasRef.current
-    if (!canvas) return
     pronounceLetter(letter)
-    const score = validateDrawing(canvas, letter)
+    const score = level !== 3 && canvas
+      ? validateDrawing(canvas, level === 2 ? traceWord : letter)
+      : 100 // level 3 has no canvas, score = 100 if vowels correct
     validationScore.value = score
     stageResults.value = [...stageResults.value, { letter, score, passed: score >= PASS_THRESHOLD }]
     gamePhase.value = 'result'
@@ -66,7 +78,7 @@ export default function GameStage() {
   function handleClearCanvas() {
     const canvas = canvasRef.current
     if (!canvas) return
-    drawReferenceLetterOnCanvas(canvas, letter)
+    drawReferenceLetterOnCanvas(canvas, level === 2 ? traceWord : letter)
   }
 
   function handleContinue() {
@@ -86,12 +98,16 @@ export default function GameStage() {
     handleClearCanvas()
   }
 
+  const canvasText = level === 2 ? traceWord : letter
+  const hintText   = level === 2 ? `${tr.wordHint}: ${traceWord}` : hint
+
   return (
     <div className="game-stage" dir={tr.dir}>
       <header className="stage-header">
         <div className="stage-info">
-          <span className="stage-badge">
-            {tr.stageBadge} {stage + 1} {tr.of} 10
+          <span className="stage-badge">{tr.stageBadge} {stage + 1} {tr.of} 10</span>
+          <span className="diff-badge diff-badge--{level}">
+            {level === 1 ? '✏️' : level === 2 ? '📝' : '🔤'} {tr[`diff${level}Label`]}
           </span>
           <span className="stage-user">👋 {userName.value}</span>
           <LangToggle />
@@ -102,23 +118,48 @@ export default function GameStage() {
       </header>
 
       <div className="stage-body">
+        {/* ── Left column: canvas (levels 1 & 2) or vowel fill (level 3) ── */}
         <div className="canvas-area">
-          <div className="hint-text">{tr.hintPrefix} {hint}</div>
-          <ColorPicker />
-          <LetterCanvas letter={letter} canvasRef={canvasRef} />
-          <div className="canvas-controls">
-            <button className="btn-clear" onClick={handleClearCanvas}>{tr.clearButton}</button>
-            <button
-              className="btn-next"
-              onClick={handleNextStage}
-              disabled={!allCorrectSelected}
-              title={!allCorrectSelected ? (tr.dir === 'rtl' ? 'יש לבחור את כל המילים הנכונות תחילה' : 'Select all correct words first') : ''}
-            >
-              {stage < 9 ? tr.nextButton : tr.finishButton}
-            </button>
-          </div>
+          <div className="hint-text">{tr.hintPrefix} {hintText}</div>
+
+          {level !== 3 && (
+            <>
+              <ColorPicker />
+              <LetterCanvas letter={canvasText} canvasRef={canvasRef} />
+              <div className="canvas-controls">
+                <button className="btn-clear" onClick={handleClearCanvas}>{tr.clearButton}</button>
+                <button
+                  className="btn-next"
+                  onClick={handleNextStage}
+                  disabled={!canProceed}
+                >
+                  {stage < 9 ? tr.nextButton : tr.finishButton}
+                </button>
+              </div>
+            </>
+          )}
+
+          {level === 3 && (
+            <>
+              <VowelFill
+                word={traceWord}
+                onComplete={ok => setVowelOk(ok)}
+                isComplete={vowelOk}
+              />
+              <div className="canvas-controls">
+                <button
+                  className="btn-next"
+                  onClick={handleNextStage}
+                  disabled={!canProceed}
+                >
+                  {stage < 9 ? tr.nextButton : tr.finishButton}
+                </button>
+              </div>
+            </>
+          )}
         </div>
 
+        {/* ── Right column: icon selection ── */}
         <LetterExamples
           letter={letter}
           isUppercase={isUppercase}

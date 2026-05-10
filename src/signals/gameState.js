@@ -7,6 +7,7 @@ export const t = computed(() => translations[language.value])
 
 export const gamePhase = signal('welcome') // 'welcome' | 'stage' | 'result' | 'completion'
 export const userName = signal('')
+export const difficulty = signal(1) // 1 | 2 | 3
 export const currentStage = signal(0)
 export const selectedColor = signal('#e74c3c')
 export const stageResults = signal([])
@@ -23,4 +24,5 @@ export function resetGame() {
   stageResults.value = []
   validationScore.value = null
   selectedLetters.value = pickRandomLetters(10)
+  // difficulty stays as chosen — user can change on welcome screen
 }
